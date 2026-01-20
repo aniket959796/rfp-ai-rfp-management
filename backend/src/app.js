@@ -21,10 +21,26 @@ app.use(cors());
 app.use(express.json());
 
 // Email inbox polling
-setInterval(() => {
-  checkInbox().catch(console.error);
-}, 60 * 1000);
 
+
+let inboxRunning = false;
+
+setInterval(async () => {
+  if (inboxRunning) {
+    console.log("⏭️ Inbox check skipped (already running)");
+    return;
+  }
+
+  inboxRunning = true;
+
+  try {
+    await checkInbox();
+  } catch (err) {
+    console.error("Inbox error:", err.message);
+  } finally {
+    inboxRunning = false;
+  }
+}, 10 * 1000);
 //  ROUTES (ONLY ONCE)
 app.use("/proposals", proposalRoutes);
 app.use("/rfps", rfpRoutes);

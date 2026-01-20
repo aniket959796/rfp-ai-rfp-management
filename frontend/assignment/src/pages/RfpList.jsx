@@ -27,43 +27,88 @@ export default function RfpList() {
       </h2>
 
       <div className="space-y-6">
-        {rfps.map((rfp) => (
-          <div key={rfp._id} className="border rounded-lg p-4">
-            <p className="font-medium">
-              {rfp.description}
-            </p>
+        {rfps.map((rfp) => {
+          const d = rfp.structuredData || {};
 
-            <p className="text-sm text-gray-500 mb-3">
-              Created: {new Date(rfp.createdAt).toLocaleString()}
-            </p>
+          return (
+            <div key={rfp._id} className="border rounded-lg p-4 space-y-3">
+              {/* Original user input */}
+              <p className="font-medium text-gray-800">
+                {rfp.description}
+              </p>
 
-            {/* Structured summary */}
-            <div className="bg-gray-50 border rounded-lg p-3 text-sm space-y-1">
-              <p>
-                <strong>Title:</strong>{" "}
-                {rfp.structuredData?.title || "—"}
+              <p className="text-sm text-gray-500">
+                Created: {new Date(rfp.createdAt).toLocaleString()}
               </p>
-              <p>
-                <strong>Budget:</strong>{" "}
-                {rfp.structuredData?.budget || "—"}
-              </p>
-              <p>
-                <strong>Delivery:</strong>{" "}
-                {rfp.structuredData?.deliveryDays || "—"} days
-              </p>
+
+              {/* Structured details */}
+              <div className="bg-gray-50 border rounded-lg p-4 text-sm space-y-2">
+                <p>
+                  <strong>Title:</strong>{" "}
+                  {d.title || "—"}
+                </p>
+
+                {/* Items */}
+                {d.items?.length > 0 && (
+                  <div>
+                    <strong>Items Required:</strong>
+                    <ul className="list-disc ml-5 mt-1 space-y-1">
+                      {d.items.map((item, idx) => (
+                        <li key={idx}>
+                          {item.quantity} {item.name}
+                          {item.specs && (
+                            <span className="text-gray-600">
+                              {" "}(
+                              {typeof item.specs === "string"
+                                ? item.specs
+                                : Object.entries(item.specs)
+                                    .map(([k, v]) => `${k}: ${v}`)
+                                    .join(", ")
+                              }
+                              )
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <p>
+                  <strong>Budget:</strong>{" "}
+                  {d.budget ? `$${d.budget}` : "—"}
+                </p>
+
+                <p>
+                  <strong>Delivery:</strong>{" "}
+                  {d.deliveryDays
+                    ? `${d.deliveryDays} days`
+                    : "—"}
+                </p>
+
+                <p>
+                  <strong>Warranty:</strong>{" "}
+                  {d.warranty || "—"}
+                </p>
+
+                <p>
+                  <strong>Payment Terms:</strong>{" "}
+                  {d.paymentTerms || "—"}
+                </p>
+              </div>
+
+              {/* Action */}
+              <button
+                onClick={() =>
+                  navigate(`/rfps/${rfp._id}/compare`)
+                }
+                className="mt-3 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+              >
+                Compare Vendor Proposals
+              </button>
             </div>
-
-            {/* Compare button */}
-            <button
-              onClick={() =>
-                navigate(`/rfps/${rfp._id}/compare`)
-              }
-              className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-            >
-              Compare Vendor Proposals
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

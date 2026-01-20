@@ -11,7 +11,7 @@ const {
 router.get("/:rfpId", getProposalsByRfp);
 
 // 2️⃣ AI recommendation for an RFP
-router.get("/:rfpId/recommendation", getAiRecommendation);
+router.get("/recommendation/:rfpId", getAiRecommendation);
 
 // 3️⃣ (optional) manual proposal submit
 router.post("/", submitProposal);

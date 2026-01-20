@@ -16,7 +16,7 @@ export default function ComparisonProposal() {
         setProposals(proposalRes.data);
 
         const recRes = await api.get(
-          `/proposals/${rfpId}/recommendation`
+          `/proposals/recommendation/${rfpId}`
         );
         setRecommendation(recRes.data.recommendation);
       } catch (err) {

@@ -19,7 +19,6 @@ function extractJson(text) {
   cleaned = cleaned.replace(/```/g, "");
   cleaned = cleaned.trim();
 
-  // Extract first valid JSON object
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
 
@@ -28,7 +27,6 @@ function extractJson(text) {
   }
 
   const jsonString = cleaned.substring(start, end + 1);
-
   return JSON.parse(jsonString);
 }
 
@@ -40,7 +38,8 @@ const generateStructuredRfp = async (userInput) => {
 Convert the following procurement request into structured JSON.
 
 RULES:
-- Respond with JSON only
+- Respond with VALID JSON only
+- The response MUST start with { and end with }
 - Do NOT use markdown
 - Do NOT add explanations
 
@@ -59,25 +58,39 @@ Procurement request:
   const response = await groq.chat.completions.create({
     model: "llama-3.1-8b-instant",
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.1,
+    temperature: 0,
     max_tokens: 800,
+    response_format: { type: "json_object" },
   });
 
   const rawText = response.choices[0].message.content;
+  const structured = extractJson(rawText);
 
-  // SAFE JSON PARSING
-  return extractJson(rawText);
+  if (!structured?.items?.length) {
+    throw new Error("AI failed to generate valid structured RFP");
+  }
+
+  return structured;
 };
 
+/**
+ * Parse vendor email reply into structured proposal data
+ */
 const parseVendorReply = async (replyText) => {
   const prompt = `
-You are a JSON extraction engine.
+You are extracting structured data from a VENDOR'S EMAIL RESPONSE.
 
-Extract the following fields from the vendor response.
-If a value is missing, return null.
+IMPORTANT RULES:
+- Extract values ONLY if explicitly mentioned by the vendor
+- DO NOT use the RFP budget
+- DO NOT infer or guess values
+- Prices must come ONLY from the vendor reply
+- Return numbers without currency symbols
+- If a value is missing, return null
+- Respond with VALID JSON ONLY
+- The response MUST start with { and end with }
 
-Return ONLY valid JSON. No explanation. No markdown.
-
+Expected JSON format:
 {
   "totalPrice": number | null,
   "deliveryDays": number | null,
@@ -86,8 +99,10 @@ Return ONLY valid JSON. No explanation. No markdown.
   "notes": string | null
 }
 
-Vendor response:
+Vendor email reply:
+"""
 ${replyText}
+"""
 `;
 
   const response = await groq.chat.completions.create({
@@ -95,12 +110,15 @@ ${replyText}
     messages: [{ role: "user", content: prompt }],
     temperature: 0,
     max_tokens: 300,
+    response_format: { type: "json_object" },
   });
 
-  const raw = response.choices[0].message.content.trim();
-
-  return JSON.parse(raw);
+  return extractJson(response.choices[0].message.content);
 };
+
+/**
+ * Get AI recommendation for best vendor
+ */
 const getBestVendorRecommendation = async (proposals) => {
   const prompt = `
 You are an AI assistant evaluating vendor proposals for a procurement RFP.
@@ -122,7 +140,7 @@ Evaluation rules:
 - Prefer reasonable payment terms
 - Select ONE best vendor
 
-Return ONLY valid JSON (no markdown, no explanation):
+Return ONLY valid JSON:
 
 {
   "recommendedVendor": string,
@@ -135,15 +153,15 @@ Return ONLY valid JSON (no markdown, no explanation):
     messages: [{ role: "user", content: prompt }],
     temperature: 0.2,
     max_tokens: 300,
+    response_format: { type: "json_object" },
   });
 
-  const rawText = response.choices[0].message.content;
-
-  // Reuse safe JSON extraction
-  return extractJson(rawText);
+  return extractJson(response.choices[0].message.content);
 };
 
-
+/**
+ * Alternative recommendation helper (optional)
+ */
 const generateProposalRecommendation = async (proposals) => {
   const prompt = `
 You are a procurement decision assistant.
@@ -165,8 +183,15 @@ ${JSON.stringify(proposals, null, 2)}
     messages: [{ role: "user", content: prompt }],
     temperature: 0.2,
     max_tokens: 300,
+    response_format: { type: "json_object" },
   });
 
-  return JSON.parse(response.choices[0].message.content);
+  return extractJson(response.choices[0].message.content);
 };
-module.exports = {generateProposalRecommendation,  getBestVendorRecommendation, parseVendorReply, generateStructuredRfp };
+
+module.exports = {
+  generateStructuredRfp,
+  parseVendorReply,
+  getBestVendorRecommendation,
+  generateProposalRecommendation,
+};

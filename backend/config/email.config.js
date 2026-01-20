@@ -12,6 +12,8 @@ module.exports = {
       servername: "imap.gmail.com",
     },
 
-    authTimeout: 3000,
+    authTimeout: 10000,   // ⬅️ 10 seconds
+  connTimeout: 10000,   // ⬅️ 10 seconds
+  socketTimeout: 10000 // ⬅️ 10 seconds
   },
 };

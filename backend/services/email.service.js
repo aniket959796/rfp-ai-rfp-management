@@ -26,6 +26,10 @@ const sendRfpEmail = async ({
     from: process.env.EMAIL_USER,
     to,
     subject,
+    headers: {
+    "X-RFP-MESSAGE": "true",
+  },
+
     text: `
 RFP REQUEST
 

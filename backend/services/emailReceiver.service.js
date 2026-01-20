@@ -11,46 +11,78 @@ async function checkInbox() {
     connection = await imaps.connect({ imap: emailConfig.imap });
     await connection.openBox("INBOX");
 
-    const searchCriteria = ["UNSEEN"];
-    const fetchOptions = { bodies: [""] };
+    // ✅ Fetch unread emails with subject containing "RFP"
+    const messages = await connection.search(
+      [
+        "UNSEEN",
+        ["SUBJECT", "RFP"]
+      ],
+      { bodies: [""], markSeen: false }
+    );
 
-    const messages = await connection.search(searchCriteria, fetchOptions);
+    console.log(`📥 Found ${messages.length} unread emails`);
+
+    if (!messages.length) {
+      return;
+    }
 
     for (const msg of messages) {
-      const parsed = await simpleParser(msg.parts[0].body);
+      try {
+        const parsed = await simpleParser(msg.parts[0].body);
 
-      const emailText = parsed.text || "";
-      const subject = parsed.subject || "";
-      const from = parsed.from?.text || "Unknown sender";
+        // ✅ Combine subject + text + html
+        const combinedText = `
+${parsed.subject || ""}
+${parsed.text || ""}
+${parsed.html || ""}
+`;
 
-      if (!subject.toLowerCase().includes("rfp")) {
-        continue;
+        // ✅ Extract IDs (PRIMARY IDENTIFIER)
+        const rfpMatch = combinedText.match(/RFP_ID[=:]\s*([a-f0-9]{24})/i);
+        const vendorMatch = combinedText.match(/VENDOR_ID[=:]\s*([a-f0-9]{24})/i);
+
+        if (!rfpMatch || !vendorMatch) {
+          console.log("⏭️ Skipping email: no RFP_ID / VENDOR_ID");
+          continue;
+        }
+
+        const rfpId = rfpMatch[1];
+        const vendorId = vendorMatch[1];
+
+        console.log("📨 Processing RFP reply");
+        console.log("RFP ID:", rfpId);
+        console.log("Vendor ID:", vendorId);
+
+        // 🚫 Prevent duplicate proposals
+        const alreadyProcessed = await Proposal.findOne({ rfpId, vendorId });
+        if (alreadyProcessed) {
+          console.warn("⚠️ Duplicate proposal detected");
+          await connection.addFlags(msg.attributes.uid, ["\\Seen"]);
+          continue;
+        }
+
+        // 🤖 Parse vendor reply
+        const structured = await parseVendorReply(combinedText);
+
+        // 💾 Save proposal
+        await Proposal.create({
+          rfpId,
+          vendorId,
+          rawResponse: combinedText,
+          structuredData: structured,
+        });
+
+        console.log("✅ Proposal saved successfully");
+
+        // ✅ Mark SEEN only after successful save
+        await connection.addFlags(msg.attributes.uid, ["\\Seen"]);
+      } catch (innerErr) {
+        console.error("❌ Failed to process email:", innerErr.message);
+        // leave UNSEEN for retry
       }
-
-      const rfpId = emailText.match(/RFP_ID:\s*([a-f\d]{24})/i)?.[1];
-      const vendorId = emailText.match(/VENDOR_ID:\s*([a-f\d]{24})/i)?.[1];
-
-      if (!rfpId || !vendorId) {
-        continue;
-      }
-
-      console.log("Processing vendor reply from:", from);
-      console.log("RFP ID:", rfpId);
-      console.log("Vendor ID:", vendorId);
-
-      const structured = await parseVendorReply(emailText);
-
-      await Proposal.create({
-        rfpId,
-        vendorId,
-        rawResponse: emailText,
-        structuredData: structured,
-      });
-
-      console.log("✅ Proposal saved for RFP:", rfpId);
     }
   } catch (error) {
-    console.error("❌ Email inbox processing failed:", error.message);
+    console.error("❌ Inbox processing failed:", error.message);
   } finally {
     if (connection) {
       connection.end();

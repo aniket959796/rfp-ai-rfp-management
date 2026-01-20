@@ -58,11 +58,17 @@ const getAiRecommendation = async (req, res) => {
   try {
     const { rfpId } = req.params;
 
-    const proposals = await Proposal.find({ rfpId })
+    if (!mongoose.Types.ObjectId.isValid(rfpId)) {
+      return res.status(400).json({ error: "Invalid RFP ID" });
+    }
+
+    const proposals = await Proposal.find({
+      rfpId: new mongoose.Types.ObjectId(rfpId),
+    })
       .populate("vendorId", "name email")
       .sort({ createdAt: 1 });
 
-    if (!proposals || proposals.length === 0) {
+    if (!proposals.length) {
       return res.status(404).json({
         error: "No proposals found for this RFP",
       });
@@ -78,9 +84,7 @@ const getAiRecommendation = async (req, res) => {
 
     const recommendation = await generateProposalRecommendation(proposalData);
 
-    res.status(200).json({
-      recommendation,
-    });
+    res.status(200).json({ recommendation });
   } catch (error) {
     console.error("AI recommendation failed:", error.message);
     res.status(500).json({

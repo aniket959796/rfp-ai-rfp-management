@@ -34,17 +34,7 @@ export default function Navbar() {
           </NavLink>
         </div>
 
-        {/* Right: profile */}
-        <div className="flex items-center gap-3 cursor-pointer">
-          <span className="text-gray-300 text-sm hidden sm:block">
-            John
-          </span>
-          <img
-            src="https://i.pravatar.cc/40"
-            alt="Profile"
-            className="w-9 h-9 rounded-full border-2 border-indigo-500"
-          />
-        </div>
+        
       </div>
     </nav>
   );
